@@ -26,24 +26,6 @@ local function showCountGroup()
 	countGroup.alpha = 1;
 end
 
-local function fruitNinja(event)
-        if "began"==event.phase then
-                bx, by=event.x, event.y
-        elseif "moved"==event.phase then
-                for i=#lines+1, #lines+1 do
-                        lines[i]=display.newLine(bx, by, event.x, event.y)
-                        lines[i]:setColor(0, 0, 255)
-                        lines[i].width=18
-                        local me=lines[i]
-                lines[i].transition=transition.to(me, {alpha=0, width=1,  time=300}) -- The key transition
-                bx, by=event.x, event.y
-                timer.performWithDelay(300, function() me:removeSelf() me=nil end) -- Don't forget to destroy and nil the lines!
-          end
-  elseif "ended"==event.phase then
-        
-        end
-end
-
 local xRand;
 
 local function spawnBall(event)
@@ -136,6 +118,63 @@ local function powerButtonTouch(event)
 	end
 end
 
+local function paintPoly(poly, xoffset, yoffset, rgba)
+ 
+    local newLine = display.newLine
+    local math_floor = math.floor
+    local math_min = math.min
+    local math_max = math.max
+    local polyGroup = display.newGroup()
+ 
+    local n = #poly
+ 
+    local minY = poly[1].y
+    local maxY = poly[1].y
+ 
+    for i = 2, n do
+        minY = math_min(minY, poly[i].y)
+        maxY = math_max(maxY, poly[i].y)
+    end
+ 
+    for y = minY, maxY do
+ 
+        local ints = {}
+        local int = 0
+        local last = n
+ 
+        for i = 1, n do
+            local y1 = poly[last].y
+            local y2 = poly[i].y
+            if y1 < y2 then
+                local x1 = poly[last].x
+                local x2 = poly[i].x
+                if (y >= y1) and (y < y2) then
+                    int = int + 1
+                    ints[int] = math_floor((y - y1) * (x2 - x1) / (y2 - y1) + x1)
+                end
+            elseif y1 > y2 then
+                local x1 = poly[last].x
+                local x2 = poly[i].x
+                if (y >= y2) and (y < y1) then
+                    int = int + 1
+                    ints[int] = math_floor((y - y2) * (x1 - x2) / (y1 - y2) + x2)
+                end
+            end
+            last = i
+        end
+ 
+        local i = 1
+        while i < int do
+            local line = newLine(ints[i] + xoffset, y + yoffset, ints[i + 1] + xoffset, y + yoffset)
+            polyGroup:insert(line)
+            line:setColor(rgba[1], rgba[2], rgba[3], rgba[4])
+            i = i + 2
+        end
+    end
+ 
+    return polyGroup
+end
+
 function scene:createScene(event)
 	local group = self.view;
 	
@@ -162,8 +201,49 @@ function scene:createScene(event)
 	
 	local countBG = display.newRoundedRect(display.contentWidth - 120, 0, 120, 80, 3);
 	countBG:setFillColor(0,0,0);
-	countBG.alpha = 0.5;
+	countBG.alpha = 0.65;
 	countGroup:insert(countBG);
+	
+	local basesBG = display.newRoundedRect(0,0,120,80,3);
+	basesBG:setFillColor(0,0,0);
+	basesBG.alpha = 0.65;
+	countGroup:insert(basesBG);
+	
+	local firstBase = display.newRect(0,0,20,20);
+	firstBase.x = 90;
+	firstBase.y = 45;
+	firstBase:setFillColor(255,215,0);
+	firstBase:rotate(45);
+	firstBase.alpha = 1;
+	countGroup:insert(firstBase);
+	
+	local secondBase = display.newRect(0,0,20,20);
+	secondBase.x = 60;
+	secondBase.y = 15;
+	secondBase:setFillColor(255,255,255);
+	secondBase:rotate(45);
+	secondBase.alpha = 0.3;
+	countGroup:insert(secondBase);
+	
+	local thirdBase = display.newRect(0,0,20,20);
+	thirdBase.x = 30;
+	thirdBase.y = 45;
+	thirdBase:setFillColor(255,255,255);
+	thirdBase:rotate(45);
+	thirdBase.alpha = 0.3;
+	countGroup:insert(thirdBase);
+	
+	local homePlateShape =
+	{
+	{x=53, y=60},
+	{x=67, y=60},
+	{x=67, y=65},
+	{x=60, y=72},
+	{x=53, y=65}
+	};
+	
+	local homePlatePoly = paintPoly(homePlateShape, 0, 5, {255,255,255,255});
+	countGroup:insert(homePlatePoly);
 	
 	local ballCount = display.newText("Balls: ", display.contentWidth - 117, 0, pokeFont, 10);
 	ballCount.y = 10;
@@ -316,11 +396,9 @@ function scene:enterScene(event)
 	storyboard.purgeScene("qplineupscene");
 	storyboard.purgeScene("qpresumescene");
 	storyboard.purgeScene("scoreboardscene");
-	Runtime:addEventListener("touch", fruitNinja);
 end
 
 function scene:exitScene(event)
-	Runtime:removeEventListener("touch", fruitNinja)
 end
 
 function scene:didExitScene(event)

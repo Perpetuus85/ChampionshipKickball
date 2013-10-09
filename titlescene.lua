@@ -15,8 +15,8 @@ local function quickPlayEvent(event)
 				event.y >= minY and event.y <= maxY and
 			event.xStart >= minX and event.xStart <= maxX and
 			event.yStart >= minY and event.yStart <= maxY) then
-				--storyboard.gotoScene("qpresumescene", "fade", 400);
-				storyboard.gotoScene("battingscene", "fade", 400);
+				storyboard.gotoScene("qpresumescene", "fade", 400);
+				--storyboard.gotoScene("battingscene", "fade", 400);
 		end
 	end
 end

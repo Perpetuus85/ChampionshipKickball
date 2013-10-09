@@ -148,9 +148,11 @@ local function playerFinalTransition()
 	local playerChosenText = "";
 	local cpuIsText = "";
 	
-	for row in db:nrows("SELECT hometeamid, playercontrolledteamid FROM game") do
-		print(row.hometeamid);
-		print(row.playercontrolledteamid);
+	for row in db:nrows("SELECT hometeamid, awayteamid, playercontrolledteamid, cpucontrolledteamid FROM game") do
+		--print('HomeID: ' .. row.hometeamid);
+		--print('AwayID: ' .. row.awayteamid);
+		--print('PlayerID: ' .. row.playercontrolledteamid);
+		--print('CPUID: ' .. row.cpucontrolledteamid);
 		if(row.hometeamid == row.playercontrolledteamid) then
 			playerChosenText = "YOU HAVE CHOSEN HOME";
 			cpuIsText = "CPU IS AWAY";
@@ -243,7 +245,7 @@ local function awayButtonEvent(event)
 			event.yStart >= minY and event.yStart <= maxY) then
 			
 			--Update game, set away team to playercontrolledteamid
-			local gameUpdate = [[UPDATE game SET awayteamid = playercontrollteamid]];
+			local gameUpdate = [[UPDATE game SET awayteamid = playercontrolledteamid]];
 			db:exec(gameUpdate);
 			--set home team to other teamid
 			gameUpdate = [[UPDATE game SET hometeamid = cpucontrolledteamid]];

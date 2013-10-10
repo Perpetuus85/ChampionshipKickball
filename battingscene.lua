@@ -14,6 +14,7 @@ local pitchBall;
 local buntButton, contactButton, powerButton, buttonGroup;
 local countGroup;
 local strikeOne, strikeTwo, ballOne, ballTwo, ballThree, foulOne, foulTwo, foulThree, outOne, outTwo;
+local dx, dy;
 
 local function hideKickButtons()
 	buttonGroup.alpha = 0;
@@ -32,7 +33,93 @@ local function showCountGroup()
 end
 
 local xRand, spawnCount;
-local isStrike;
+local isStrike, touchKick;
+local kickPower;
+
+local resetPitch, removeTouchKickListener;
+
+local function deletePitchBallAndGo()
+	pitchBall:removeSelf();
+	pitchBall = nil;
+	physics.stop();
+	storyboard.gotoScene("overworldscene", 
+		{
+			effect = "fade",
+			time = 250,
+			params = 
+			{
+				dirX = dx,
+				dirY = dy,
+				power = kickPower,
+				prev = 'battingscene'
+			}
+		}
+	);
+end
+
+local function onKickCollision(self, event)
+	if(event.phase == "began" and event.other.myName == "pitchBall") then
+		--Get the vector between self.x,self.y and event.other.x,event.other.y
+		dx = event.other.x - self.x;
+		dy = event.other.y - self.y;
+		--print(self.myName .. ": collision with " .. event.other.myName);
+		removeTouchKickListener();
+		touchKick:removeSelf();
+		touchKick = nil;		
+		pitchBall:applyLinearImpulse(dx / 10, 0, pitchBall.x, pitchBall.y);
+		--timer.performWithDelay(250, resetPitch);
+		timer.performWithDelay(250, deletePitchBallAndGo);		
+	end
+end
+
+local function touchKickBody(event)
+	if(event.phase == "began") then
+		--Add physics body at event.x,event.y
+		if(touchKick ~= nil) then
+			touchKick:removeSelf();
+			touchKick = nil;
+		end
+		touchKick = display.newRect(0,0,50,50);
+		touchKick.x = event.x;
+		touchKick.y = event.y;
+		touchKick.alpha = 0;
+		--Power sets the bounce
+		local myBounce;
+		if(kickPower == 1) then
+			myBounce = 0.1;
+		elseif(kickPower == 2) then
+			myBounce = 1.0;
+		else
+			myBounce = 2.0;
+		end
+		physics.addBody(touchKick, {density = 6.0, friction = 0, bounce = myBounce});
+		touchKick.myName = "touchKick";
+		--Physics body needs collision detection with pitchball
+		touchKick.collision = onKickCollision;
+		touchKick:addEventListener("collision", touchKick);
+	elseif(event.phase == "moved") then
+		--Move physics body to event.x,event.y
+		if(touchKick ~= nil) then
+			touchKick.x = event.x;
+			touchKick.y = event.y;
+		end
+	elseif(event.phase == "ended") then
+		--Remove physics body
+		if(touchKick ~= nil) then
+			touchKick:removeSelf();
+			touchKick = nil;
+		end
+	end
+	return true;
+end
+
+local function startTouchKickListener()
+	Runtime:addEventListener("touch", touchKickBody);
+end
+
+removeTouchKickListener = function()
+	Runtime:removeEventListener("touch", touchKickBody);
+end
 
 local function spawnBall(event)
 	local x = pitchBall.x;
@@ -55,7 +142,7 @@ local function spawnBall(event)
 	end
 end
 
-local function resetPitch(event)
+resetPitch = function(event)
 	isStrike = nil;
 	pitchBall:removeSelf();
 	pitchBall = display.newCircle(display.contentWidth / 2 - 2, 110, 2);
@@ -227,6 +314,11 @@ local function onLocalCollision(self, event)
 				--Update ball count and display
 				addBall();
 			end
+			if(touchKick ~= nil) then
+				removeTouchKickListener();
+				touchKick:removeSelf();
+				touchKick = nil;				
+			end
 		elseif(self.myName == "pHomePlate" and event.other.myName == "pitchBall") then
 			--It is a strike
 			isStrike = true;
@@ -257,6 +349,9 @@ local function buntButtonTouch(event)
 			event.yStart >= minY and event.yStart <= maxY) then
 			hideKickButtons();
 			hideCountGroup();
+			startTouchKickListener();
+			--Set power to bunt
+			kickPower = 1;
 			timer.performWithDelay(1000, pitch);
 		end
 	end
@@ -277,6 +372,9 @@ local function contactButtonTouch(event)
 			event.yStart >= minY and event.yStart <= maxY) then
 			hideKickButtons();
 			hideCountGroup();
+			startTouchKickListener();
+			--Set power to contact
+			kickPower = 2;
 			timer.performWithDelay(1000, pitch);
 		end
 	end
@@ -297,6 +395,9 @@ local function powerButtonTouch(event)
 			event.yStart >= minY and event.yStart <= maxY) then
 			hideKickButtons();
 			hideCountGroup();
+			startTouchKickListener();
+			--Set power to power
+			kickPower = 3;
 			timer.performWithDelay(1000, pitch);
 		end
 	end
@@ -703,6 +804,7 @@ function scene:enterScene(event)
 	storyboard.purgeScene("qplineupscene");
 	storyboard.purgeScene("qpresumescene");
 	storyboard.purgeScene("scoreboardscene");
+	storyboard.purgeScene("overworldscene");
 	
 end
 

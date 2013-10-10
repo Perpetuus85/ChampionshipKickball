@@ -4,13 +4,29 @@ local scene = storyboard.newScene();
 local dirX, dirY, power, kickBall;
 local physics = require("physics");
 local distX, distY, prevScene;
+local moveBallEnd;
+local randomAngle;
+local myScaleXY;
 
 local function goToPreviousScene()
 	storyboard.gotoScene(prevScene, "fade", 250);
 end
 
 local function listener1(obj)
+	moveBallEnd();	
+end
+
+local function listener2(obj)
 	timer.performWithDelay(1000, goToPreviousScene);
+end
+
+local function moveBallStart()
+	myScaleXY = randomAngle / 30 + 1.0;
+	transition.to(kickBall, {time = 2000, delay=50, x = kickBall.x + distX / 2, y = kickBall.y + distY / 2, xScale = myScaleXY, yScale = myScaleXY, onComplete = listener1});
+end
+
+moveBallEnd = function()
+	transition.to(kickBall, {time = 2000, x = kickBall.x + distX / 2, y = kickBall.y + distY / 2, xScale = 1, yScale = 1, onComplete = listener2});
 end
 
 function scene:createScene(event)
@@ -31,12 +47,11 @@ function scene:createScene(event)
 	--Create ball at middle bottom of screen
 	kickBall = display.newCircle(display.contentWidth / 2, display.contentHeight - 20,5);
 	kickBall:setFillColor(255,0,0);
-	kickBall.strokeWidth = 1;
-	kickBall:setStrokeColor(0,0,0);
+	--kickBall.strokeWidth = 1;
+	--kickBall:setStrokeColor(0,0,0);
 	group:insert(kickBall);
 	
 	--Random angle depending on kickpower
-	local randomAngle;
 	if(power == 1) then
 		randomAngle = 0;
 	elseif(power == 2) then
@@ -53,11 +68,11 @@ function scene:createScene(event)
 	print('Multi: ' .. distanceMultiplier);
 	local setDistance;
 	if(power == 1) then
-		setDistance = 50 * distanceMultiplier;
+		setDistance = 35 * distanceMultiplier;
 	elseif(power == 2) then
 		setDistance = 75 * distanceMultiplier;
 	else
-		setDistance = 120 * distanceMultiplier;
+		setDistance = 100 * distanceMultiplier;
 	end
 	local kickAngle = math.deg(math.asin(dirY / (math.sqrt(math.pow(dirX, 2) + math.pow(dirY, 2)))));
 	distY = setDistance * math.sin(math.rad(kickAngle));
@@ -65,10 +80,10 @@ function scene:createScene(event)
 	if(dirX < 0) then
 		distX = distX * -1;
 	end
-	distY = kickBall.y + distY;
-	distX = kickBall.x + distX;
-	print('DistX: ' .. distX);
-	print('DistY: ' .. distY);
+	--distY = kickBall.y + distY;
+	--distX = kickBall.x + distX;
+	--print('DistX: ' .. distX);
+	--print('DistY: ' .. distY);
 end
 
 function scene:willEnterScene(event)
@@ -83,7 +98,7 @@ function scene:enterScene(event)
 	--height of ball with depend on angle of kick and power
 	--example 60 degree / power = 3 ball will be in air from start to finish
 	--example 2 1 degree / power = 2 ball will be in air for minimal time
-	transition.to(kickBall, {time = 2000, delay=50, x = distX, y = distY, onComplete = listener1});
+	moveBallStart();
 end
 
 function scene:exitScene(event)

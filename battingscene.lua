@@ -93,6 +93,7 @@ local function touchKickBody(event)
 			myBounce = 2.0;
 		end
 		physics.addBody(touchKick, {density = 6.0, friction = 0, bounce = myBounce});
+		touchKick.isFixedRotation = true;
 		touchKick.myName = "touchKick";
 		--Physics body needs collision detection with pitchball
 		touchKick.collision = onKickCollision;

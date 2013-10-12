@@ -1,6 +1,12 @@
 local widget = require("widget");
 local storyboard = require("storyboard");
 local scene = storyboard.newScene();
+
+require "sqlite3";
+local path = system.pathForFile("data.db", system.DocumentsDirectory);
+db = sqlite3.open( path );  
+
+
 local dirX, dirY, power, kickBall;
 local physics = require("physics");
 local distX, distY, prevScene;
@@ -10,6 +16,8 @@ local myScaleXY;
 local ballUpTime, ballDownTime, ballRollTime;
 local distAirX, distAirY;
 local distRollX, distRollY;
+local fieldIsCPU;
+local p, c, b1, b2, b3, ss, lf, lcf, cf, rcf, rf;
 
 local function goToPreviousScene()
 	storyboard.gotoScene(prevScene, "fade", 250);
@@ -23,12 +31,17 @@ local function listener2(obj)
 	moveBallRoll();
 end
 
-local function listener3(obj)
-	timer.performWithDelay(1000, goToPreviousScene);
-end
-
 local function ballWallCollision(self, event)
 	if(event.phase == "began" and event.other.myName == "wall") then
+		--Home Run!!!
+	end
+end
+
+--ONLY FOR DEBUGGING
+local function didBallStop()
+	local vx, vy = kickBall:getLinearVelocity();
+	if(vx == 0 and vy == 0) then
+		Runtime:removeEventListener("enterFrame", didBallStop);
 		timer.performWithDelay(1000, goToPreviousScene);
 	end
 end
@@ -45,23 +58,17 @@ end
 moveBallRoll = function()
 	kickBall:setFillColor(0,0,255);
 	--Kickball becomes physics object when rolling to apply linear damping to slow down
-	--initial velocity depends on power
-	--kickBall.x / ballRollTime -> x velocity
-	--kickBall.y / ballRollTime -> y velocity
-	print('X: ' .. kickBall.x);
-	print('Y: ' .. kickBall.y);
-	print('BallRollTime: ' .. ballRollTime);
 	local xVel = distRollX / ballRollTime * 1000;
 	local yVel = distRollY / ballRollTime * 1000;
-	print('xVel: ' .. xVel);
-	print('yVel: ' .. yVel);
 	physics.addBody(kickBall, {radius = 5, density = 1.0, friction = 0.3, bounce = 0.2});
-	--transition.to(kickBall, {time = ballRollTime, x = kickBall.x + distRollX, y = kickBall.y + distRollY, onComplete = listener3});
 	kickBall.linearDamping = 0.5;
 	kickBall.myName = "kickBall";
 	kickBall.collision = ballWallCollision;
 	kickBall:addEventListener("collision", kickBall);
 	kickBall:setLinearVelocity(xVel, yVel);
+	
+	--ONLY FOR DEBUGGING
+	Runtime:addEventListener("enterFrame", didBallStop);
 end
 
 function scene:createScene(event)
@@ -79,6 +86,84 @@ function scene:createScene(event)
 	group:insert(wall);
 	
 	physics.addBody(wall, {density = 1.0, friction = 0.3, bounce = 0.2, isSensor = true});	
+	
+	--NEED LINEUP FOR TEAM TO ADD PLAYERS ON FIELD
+	local teamID, lineupPos;
+	for row in db:nrows("SELECT currentinning, currenthalf, hometeamid, awayteamid, playercontrolledteamid, cpucontrolledteamid FROM game") do
+		--if half == 1 then home else away
+		if(row.currenthalf == 1) then
+			teamID = row.hometeamid
+		else
+			teamID = row.awayteamid
+		end
+		--if inning is odd then 1 else 2
+		if(row.currentinning % 2 == 0) then
+			lineupPos = 2;
+		else
+			lineupPos = 1;
+		end
+		if(teamID == playercontrolledteamid) then
+			fieldIsCPU = false;
+		else
+			fieldIsCPU = true;
+		end
+	end
+	row = nil;
+	local fieldLineupID, getLineupID;
+	if(lineupPos == 1) then
+		getLineupID = "SELECT MIN(lineupid) as lineupid FROM lineup WHERE teamid = teamID";
+	else
+		getLineupID = "SELECT MAX(lineupid) as lineupid FROM lineup WHERE teamid = teamID";		
+	end
+	for row in db:nrows(getLineupID) do
+		fieldLineupID = row.lineupid;
+	end
+	row = nil;
+	for row in db:nrows("SELECT p.sex, l.position FROM player AS p JOIN lineupdetail AS l on p.playerid = l.playerid WHERE l.lineupid = " .. fieldLineupID) do
+		local colorOfBox = (row.sex == 'M' and {0,0,255}  or {255,0,0});
+		if(row.position == 'P') then
+			p = display.newRect(0,0,10,10);
+			p.x = display.contentWidth / 2;
+			p.y = display.contentHeight / 2 + 60;
+			p:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(p);
+		elseif(row.position == 'C') then
+			c = display.newRect(0,0,10,10);
+			c.x = display.contentWidth / 2;
+			c.y = display.contentHeight - 5;
+			c:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(c);
+		elseif(row.position == '3B') then
+			b3 = display.newRect(0,0,10,10);
+			b3.x = display.contentWidth / 2 - 80;
+			b3.y = display.contentHeight / 2 + 50;
+			b3:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(b3);
+		elseif(row.position == 'SS') then
+			ss = display.newRect(0,0,10,10);
+			ss.x = display.contentWidth / 2 - 40;
+			ss.y = display.contentHeight / 2 - 10;
+			ss:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(ss);
+		elseif(row.position == '2B') then
+			b2 = display.newRect(0,0,10,10);
+			b2.x = display.contentWidth / 2 + 40;
+			b2.y = display.contentHeight / 2 - 10;
+			b2:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(b2);
+		elseif(row.position == '1B') then
+			b1 = display.newRect(0,0,10,10);
+			b1.x = display.contentWidth / 2 + 80;
+			b1.y = display.contentHeight / 2 + 50;
+			b1:setFillColor(colorOfBox[1], colorOfBox[2], colorOfBox[3]);
+			group:insert(b1);
+		elseif(row.position == 'LF') then
+		elseif(row.position == 'LCF') then
+		elseif(row.position == 'CF') then
+		elseif(row.position == 'RCF') then
+		elseif(row.position == 'RF') then
+		end
+	end
 	
 	dirX = event.params.dirX;
 	--print('DirX: ' .. dirX);

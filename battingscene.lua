@@ -315,11 +315,12 @@ local function onLocalCollision(self, event)
 				--Update ball count and display
 				addBall();
 			end
-			if(touchKick ~= nil) then
-				removeTouchKickListener();
+			if(touchKick ~= nil) then				
 				touchKick:removeSelf();
 				touchKick = nil;				
 			end
+			--print('Remove Touch Kick');
+			removeTouchKickListener();
 		elseif(self.myName == "pHomePlate" and event.other.myName == "pitchBall") then
 			--It is a strike
 			isStrike = true;

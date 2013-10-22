@@ -33,6 +33,7 @@ local runnerReached, checkWhatToDo, addOut;
 local runnerSecondReached, runnerThirdReached, runnerHomeReached;
 local checkOutAtFirst, checkOutAtSecond, checkOutAtThird, nextAtBat;
 local firstBaseRunner, secondBaseRunner, thirdBaseRunner;
+local aFBRunner, aSBRunner, aTBRunner;
 local currentouts;
 
 nextAtBat = function(obj)
@@ -410,16 +411,22 @@ moveBallUp = function()
 	runnerToFirst = true;
 	if(currentouts == 2) then
 		--everyone should start running if there is two outs no matter what
-		if(firstBaseRunner.exists == true) then
+		if(aFBRunner == true) then
 			runnerToSecond = true;
+			firstBaseRunner.isRunning = true;
+			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = 4000, x = secondBase.x, y = secondBase.y, onComplete=runnerSecondReached});
 		end
 		
-		if(secondBaseRunner.exists == true) then
+		if(aSBRunner == true) then
 			runnerToThird = true;
+			secondBaseRunner.isRunning = true;
+			secondBaseRunner.myTrans = transition.to(secondBaseRunner, {time = 4000, x = thirdBase.x, y = thirdBase.y, onComplete=runnerThirdReached});
 		end
 		
-		if(thirdBaseRunner.exists == true) then
+		if(aTBRunner == true) then
 			runnerToHome = true;
+			thirdBaseRunner.isRunning = true;
+			thirdBaseRunner.myTrans = transition.to(thirdBaseRunner, {time = 4000, x = homePlate.x, y = homePlate.y, onComplete=runnerHomeReached});
 		end
 	else
 	end
@@ -443,15 +450,17 @@ moveBallRoll = function()
 	kickBall:setLinearVelocity(xVel, yVel);
 	transitionClosestToKickball();
 	--if runners are not running, get them to start running
-	if(firstBaseRunner.exists == true) then
+	if(aFBRunner == true) then
+		print("FB Runner");
 		if(firstBaseRunner.isRunning == false) then
+			print("FB Runner GO");
 			runnerToSecond = true;
 			firstBaseRunner.isRunning = true;
 			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = 4000, x = secondBase.x, y = secondBase.y, onComplete=runnerSecondReached});
 		end
 	end
 	
-	if(secondBaseRunner.exists == true) then
+	if(aSBRunner == true) then
 		if(secondBaseRunner.isRunning == false) then
 			runnerToThird = true;
 			secondBaseRunner.isRunning = true;
@@ -459,8 +468,8 @@ moveBallRoll = function()
 		end
 	end
 	
-	if(thirdBaseRunner.exists == true) then
-		if(thirdBaseRunner.isRunning = false) then
+	if(aTBRunner == true) then
+		if(thirdBaseRunner.isRunning == false) then
 			runnerToHome = true;
 			thirdBaseRunner.isRunning = true;
 			thirdBaseRunner.myTrans = transition.to(thirdBaseRunner, {time = 4000, x = homePlate.x, y = homePlate.y, onComplete=runnerHomeReached});
@@ -646,10 +655,11 @@ function scene:createScene(event)
 			firstBaseRunner.x = firstBase.x;
 			firstBaseRunner.y = firstBase.y;
 			firstBaseRunner:setFillColor(175,175,175);
-			firstBaseRunner.exists = true;
+			aFBRunner = true;
+			firstBaseRunner.isRunning = false;
 			group:insert(firstBaseRunner);
 		else
-			firstBaseRunner.exists = false;
+			aFBRunner = false;
 		end
 		
 		if(row.secondbaserunner ~= 0) then
@@ -658,10 +668,11 @@ function scene:createScene(event)
 			secondBaseRunner.x = secondBase.x;
 			secondBaseRunner.y = secondBase.y;
 			secondBaseRunner:setFillColor(175,175,175);
-			secondBaseRunner.exists = true;
+			aSBRunner = true;
+			secondBaseRunner.isRunning = false;
 			group:insert(secondBaseRunner);
 		else
-			secondBaseRunner.exists = false;
+			aSBRunner = false;
 		end
 		
 		if(row.thirdbaserunner ~= 0) then
@@ -670,10 +681,11 @@ function scene:createScene(event)
 			thirdBaseRunner.x = thirdBase.x;
 			thirdBaseRunner.y = thirdBase.y;
 			thirdBaseRunner:setFillColor(175,175,175);
-			thirdBaseRunner.exists = true;
+			aTBRunner = true;
+			thirdBaseRunner.isRunning = false;
 			group:insert(thirdBaseRunner);
 		else
-			thirdBaseRunner.exists = false;
+			aTBRunner = false;
 		end
 	end
 	

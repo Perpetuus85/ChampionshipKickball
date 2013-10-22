@@ -34,7 +34,8 @@ local runnerSecondReached, runnerThirdReached, runnerHomeReached;
 local checkOutAtFirst, checkOutAtSecond, checkOutAtThird, nextAtBat;
 local firstBaseRunner, secondBaseRunner, thirdBaseRunner;
 local aFBRunner, aSBRunner, aTBRunner;
-local currentouts;
+local currentouts, keepRunning;
+local holdButton, runForwardButton, runBackButton;
 
 nextAtBat = function(obj)
 	--set current kicker to next in lineup
@@ -485,6 +486,15 @@ createPlayer = function(x,y,color)
 	return player;
 end
 
+local function holdButtonTouch(event)
+end
+
+local function runForwardButtonTouch(event)
+end
+
+local function runBackButtonTouch(event)
+end
+
 function scene:createScene(event)
 	closestPlayer = nil;
 	minDistance = nil;
@@ -646,6 +656,82 @@ function scene:createScene(event)
 	group:insert(kickBall);
 	
 	kickBall.pickedUp = false;
+	keepRunning = false;
+	
+	holdButton = widget.newButton
+	{
+		top = 0,
+		left = 0,
+		width = 150,
+		height = 45,
+		font = "BORG9",
+		fontSize = 24,
+		labelColor =
+		{ 
+			default = { 255,255,255,255},
+			over = {255,255,255,255},
+		},
+		defaultFile = 'images/mainMenuItem.png',
+		overFile = 'images/mainMenuItemOver.png',
+		id = 'holdButton',
+		label = 'Hold',
+		onEvent = holdButtonTouch
+	};
+	holdButton.x = display.contentWidth / 2 - 180;
+	holdButton.y = display.contentHeight / 2 + 100;
+	if(fieldIsCPU == true) then
+		group:insert(holdButton);
+	end
+	
+	runForwardButton = widget.newButton
+	{
+		top = 0,
+		left = 0,
+		width = 90,
+		height = 45,
+		font = "BORG9",
+		fontSize = 24,
+		labelColor =
+		{
+			default = {255,255,255,255},
+			over = {255,255,255,255}
+		},
+		defaultFile = 'images/mainMenuItem.png',
+		overFile = 'images/mainMenuItemOver.png',
+		id = 'runForwardButton',
+		label = 'RUN',
+		onEvent = runForwardButtonTouch
+	};
+	runForwardButton.x = display.contentWidth / 2 + 125;
+	runForwardButton.y = display.contentHeight / 2 + 100;
+	if(fieldIsCPU == true) then
+		group:insert(runForwardButton);
+	end
+	
+	runBackButton = widget.newButton
+	{
+		top = 0,
+		left = 0,
+		width = 90,
+		height = 45,
+		font = "BORG9",
+		fontSize = 24,
+		labelColor =
+		{
+			default = {255,255,255,255},
+			over = {255,255,255,255}
+		},
+		defaultFile = 'images/mainMenuItem.png',
+		overFile = 'images/mainMenuItemOver.png',
+		id = 'runBackButton',
+		label = 'BACK',
+		onEvent = runBackButtonTouch
+	};
+	runBackButton.x = display.contentWidth / 2 + 220;
+	runBackButton.y = display.contentHeight / 2 + 100;
+	if(fieldIsCPU == true) then
+		group:insert(runBackButton);
+	end
 	
 	row = nil;
 	for row in db:nrows("SELECT firstbaserunner, secondbaserunner, thirdbaserunner from GAME") do	

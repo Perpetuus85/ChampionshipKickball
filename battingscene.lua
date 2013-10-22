@@ -468,9 +468,9 @@ function scene:createScene(event)
 	physics.setDrawMode("hybrid");
 	
 	local group = self.view;
-	local titleLogo = display.newImageRect("images/battingBG.jpg", 480, 320);
-	titleLogo.x = display.contentWidth / 2;
-	titleLogo.y = display.contentHeight / 2;
+	--local titleLogo = display.newImageRect("images/battingBG.jpg", 480, 320);
+	local titleLogo = display.newRect(0,0,display.contentWidth, display.contentHeight);
+	titleLogo:setFillColor(255,255,255);
 	group:insert(titleLogo);
 	
 	local myFont = "BORG9";
@@ -789,7 +789,7 @@ function scene:createScene(event)
 	
 	local pHomePlate = display.newRect(0,0,110,5);
 	pHomePlate.x = display.contentWidth / 2;
-	pHomePlate.y = display.contentHeight - 55;
+	pHomePlate.y = display.contentHeight / 2 + 105;
 	pHomePlate.alpha = 0;
 	group:insert(pHomePlate);
 	

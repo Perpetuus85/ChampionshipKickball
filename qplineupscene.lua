@@ -154,9 +154,11 @@ end
 function scene:createScene(event)
 	local group = self.view;
 	
-	local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
-	titleLogo.x = display.contentWidth / 2;
-	titleLogo.y = display.contentHeight / 2;
+	--local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
+	--titleLogo.x = display.contentWidth / 2;
+	--titleLogo.y = display.contentHeight / 2;
+	local titleLogo = display.newRect(0,0,display.contentWidth, display.contentHeight);
+	titleLogo:setFillColor(0,0,0);
 	group:insert(titleLogo);
 	
 	local myFont = "BORG9";
@@ -225,7 +227,7 @@ function scene:createScene(event)
 		label = "Red",
 		onEvent = redButtonEvent,
 	};
-	teamRed.x = 130;
+	teamRed.x = display.contentWidth / 2 - 100;
 	teamRed.y = display.contentHeight / 2;
 	group:insert(teamRed);
 	
@@ -248,7 +250,7 @@ function scene:createScene(event)
 		label = "Blue",
 		onEvent = blueButtonEvent,
 	};
-	teamBlue.x = display.contentWidth - 130;
+	teamBlue.x = display.contentWidth / 2 + 100;
 	teamBlue.y = display.contentHeight / 2;
 	group:insert(teamBlue);
 	

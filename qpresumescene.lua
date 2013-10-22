@@ -84,9 +84,11 @@ end
 function scene:createScene(event)
 	local group = self.view;
 	
-	local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
-	titleLogo.x = display.contentWidth / 2;
-	titleLogo.y = display.contentHeight / 2;
+	--local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
+	--titleLogo.x = display.contentWidth / 2;
+	--titleLogo.y = display.contentHeight / 2;
+	local titleLogo = display.newRect(0,0,display.contentWidth, display.contentHeight);
+	titleLogo:setFillColor(0,0,0);
 	group:insert(titleLogo);
 	
 	local myFont = "BORG9";

@@ -22,32 +22,179 @@ local p, c, b1, b2, b3, ss, lf, lcf, cf, rcf, rf;
 local playerTable;
 local createPlayer;
 local closestPlayer, goToPreviousScene;
-local firstBase, secondBase, thirdBase;
+local firstBase, secondBase, thirdBase, homePlate;
 local kicker;
-local transitionClosestToKickball;
+local transitionClosestToKickball, reachedKickball, getClosestFielderToMove;
+local getClosest;
+local landX, landY, minDistance;
+local previousClosestPlayer, previousClosestColor;
+local runnerToFirst, runnerToSecond, runnerToThird, runnerToHome;
+local runnerReached, checkWhatToDo, addOut;
+local runnerSecondReached, runnerThirdReached, runnerHomeReached;
+local checkOutAtFirst, checkOutAtSecond, checkOutAtThird, nextAtBat;
+local firstBaseRunner, secondBaseRunner, thirdBaseRunner;
+local currentouts;
+
+nextAtBat = function(obj)
+	--set current kicker to next in lineup
+	local nextKickerID;
+	
+	local currentdetailid, currentteamid;
+	for row in db:nrows("SELECT d.detailid, l.teamid FROM lineupdetail as d JOIN lineup as l on l.lineupid = d.lineupid WHERE playerid = (SELECT currentkicker FROM game)") do
+		currentdetailid = row.detailid;
+		currentteamid = row.teamid;
+	end
+	local possibleNextId = currentdetailid + 1;
+	local gotPlayerID = false;
+	for row in db:nrows("SELECT d.playerid, d.lineupid FROM lineupdetail as d JOIN lineup as l on l.lineupid = d.lineupid WHERE l.teamid = ".. currentteamid .. " AND d.detailid = " .. possibleNextId) do
+		gotPlayerID = true;
+		nextKickerID = row.playerid;
+	end
+	if(gotPlayerID == false) then
+		local currentlineupid;
+		for row in db:nrows("SELECT MIN(lineupid) as lineupid FROM lineup WHERE teamid = " .. currentteamid) do
+			currentlineupid = row.lineupid;
+		end
+		local nextLineupdetailid;
+		for row in db:nrows("SELECT MIN(detailid) as detailid FROM lineupdetail WHERE lineupid = " .. currentlineupid) do
+			nextLineupdetailid = row.detailid;
+		end
+		for row in db:nrows("SELECT playerid FROM lineupdetail WHERE detailid = " .. nextLineupdetailid) do
+			nextKickerID = row.playerid;
+		end
+	end
+	local gameUpdate = [[UPDATE game SET currentkicker = ]]..nextKickerID..[[;]];
+	db:exec(gameUpdate);
+	timer.performWithDelay(1000, goToPreviousScene);
+end
+
+checkOutAtFirst = function()
+	if(runnerToFirst == true) then
+		--OUT
+		print('OUT AT FIRST');
+		addOut();
+	else
+		--SAFE
+		print('SAFE AT FIRST');
+		local gameUpdate = [[UPDATE game SET firstbaserunner = currentkicker;]];
+		db:exec(gameUpdate);
+		timer.performWithDelay(500,checkWhatToDo);
+	end	
+end
+
+checkOutAtSecond = function()
+	if(runnerToSecond == true) then
+		--OUT
+		print('OUT AT SECOND');
+	else
+		--SAFE
+		print('SAFE AT SECOND');
+		local gameUpdate = [[UPDATE game SET secondbaserunner = firstbaserunner;]];
+		db:exec(gameUpdate);
+	end
+	timer.performWithDelay(500,checkWhatToDo);
+end
+
+checkOutAtThird = function()
+	if(runnerToThird == true) then
+		--OUT
+		print('OUT AT THIRD');
+	else
+		--SAFE
+		print('SAFE AT THIRD');
+		local gameUpdate = [[UPDATE game SET thirdbaserunner = secondbaserunner;]];
+		db:exec(gameUpdate);
+	end
+	timer.performWithDelay(500,checkWhatToDo);
+end
+
+checkWhatToDo = function()
+	--if fieldIsCPU is true decide where to throw
+	--else show player where they can throw
+	if(runnerToThird == true) then
+		--if not b3
+		if(closestPlayer.pos ~= '3B') then
+			--throw to third
+			--get distance from closestPlayer to b3
+			local dist = math.sqrt((closestPlayer.x - b3.x)^2 + (closestPlayer.y - b3.y)^2);
+			--calc time going 30 pps
+			local myTime = dist / 65 * 1000;
+			transition.to(kickBall, {time = myTime, x = b3.x, y = b3.y, onComplete=checkOutAtThird});
+		else
+			--else run to third
+		end
+	elseif(runnerToSecond == true) then
+		--always throw to second no matter who closest player is
+		local dist = math.sqrt((closestPlayer.x - b2.x)^2 + (closestPlayer.y - b2.y)^2);
+		--calc time going 30 pps
+		local myTime = dist / 65 * 1000;
+		transition.to(kickBall, {time = myTime, x = b2.x, y = b2.y, onComplete=checkOutAtSecond});
+	elseif(runnerToFirst == true) then
+		--if not b1
+		if(closestPlayer.pos ~= '1B') then
+			--throw to first
+			local dist = math.sqrt((closestPlayer.x - b1.x)^2 + (closestPlayer.y - b1.y)^2);
+			local myTime = dist / 65 * 1000;
+			transition.to(kickBall, {time = myTime, x = b1.x, y = b1.y, onComplete=checkOutAtFirst});
+		else
+			--else run to first
+		end
+	else
+		--if not pitcher
+		if(closestPlayer.pos ~= 'P') then
+			--throw to pitcher
+			local dist = math.sqrt((closestPlayer.x - p.x)^2 + (closestPlayer.y - p.y)^2);
+			local myTime = dist / 65 * 1000;
+			transition.to(kickBall, {time = myTime, x = p.x, y = p.y, onComplete=nextAtBat});
+		else
+			--else go to previousScene
+		end
+	end
+end
 
 local function goToScoreboard()
 	storyboard.gotoScene("scoreboardscene", "fade", 400);
 end
 
-transitionClosestToKickball = function()
-	if(kickBall.pickedUp == false)
-		--create transition for closestPlayer towards kickball, on complete call this function
-		local kX = kickBall.x;
-		local kY = kickBall.y;
-		local pX = closestPlayer.x;
-		local pY = closestPlayer.y;
-		local h = 2;
-		local y = math.abs(kY-pY);
-		local angle = math.deg(math.asin(y / h));
-		local myDistY = 2 * math.sin(math.rad(angle));
-		local myDistX = 2 - myDistY;
-		--moving at 10 pps calculate distance moved over 200 ms towards kX,kY in X,Y direction
-		closestPlayer.myTrans = transition.to(closestPlayer, {time = 200,
+reachedKickball = function(obj)
+	if(kickBall.x + 5 >= closestPlayer.x - 5 and kickBall.x - 5 <= closestPlayer.x + 5
+		and kickBall.y + 5 >= closestPlayer.y - 5 and kickBall.y - 5 <= closestPlayer.y + 5) then
+		kickBall.pickedUp = true;
+		kickBall:setLinearVelocity(0,0);
+		kickBall.x = closestPlayer.x;
+		kickBall.y = closestPlayer.y;
+		timer.performWithDelay(500, checkWhatToDo);
+	else
+		getClosest(kickBall.x, kickBall.y);
+		transitionClosestToKickball();
 	end
 end
 
-local function addOut()
+transitionClosestToKickball = function()
+	--create transition for closestPlayer towards kickball
+	local kX = kickBall.x;
+	local kY = kickBall.y;
+	local pX = closestPlayer.x;
+	local pY = closestPlayer.y;
+	local h = math.sqrt((kX - pX)^2 + (kY - pY)^2);
+	local y = math.abs(kY-pY);
+	--print('y ' .. y);
+	local angle = math.asin(y / h);
+	--print('angle ' .. angle);
+	local myDistY = 2.5 * math.sin(angle);
+	local myDistX = 2.5 * math.cos(angle);
+	if(kX < pX) then
+		myDistX = -1 * myDistX;
+	end
+	if(kY < pY) then
+		myDistY = -1 * myDistY;
+	end
+	--print('DistY ' .. myDistY);
+	--print('DistX ' .. myDistX);
+	closestPlayer.myTrans = transition.to(closestPlayer, {time = 100, delta = true, x = myDistX, y = myDistY, onComplete = reachedKickball});
+end
+
+addOut = function()
 	local currentOutCount, currentHalf, currentInning;
 	for row in db:nrows("SELECT currentouts, currenthalf, currentinning FROM game") do
 		currentOutCount = row.currentouts;
@@ -64,8 +211,12 @@ local function addOut()
 			setHalf = 1;
 			setInning = currentInning + 1;
 		end
-		print(setHalf);
-		print(setInning);
+		--print(setHalf);
+		--print(setInning);
+		if(kickBall ~= nil) then
+			kickBall:removeSelf();
+			kickBall = nil;
+		end
 		local updateCounts = [[UPDATE game SET currentouts = 0, currentballs = 0, currentstrikes = 0, currentfouls = 0, firstbaserunner = 0, secondbaserunner = 0, thirdbaserunner = 0, currenthalf = ]]..setHalf..[[, currentinning = ]]..setInning..[[;]];
 		db:exec(updateCounts);
 		timer.performWithDelay(1000, goToScoreboard);
@@ -74,7 +225,7 @@ local function addOut()
 		currentOutCount = currentOutCount + 1;
 		local updateOuts = [[UPDATE game set currentouts = ]]..currentOutCount..[[, currentballs = 0, currentstrikes = 0, currentfouls = 0;]];
 		db:exec(updateOuts);
-		timer.performWithDelay(1000, goToPreviousScene);
+		timer.performWithDelay(500, checkWhatToDo);
 	end
 end
 
@@ -82,36 +233,57 @@ local function listener3(obj)
 	--print('Player arrived at ball landing spot');
 end
 
-local function getClosestFielderToMove()
-	local landX, landY;
-	landX = (display.contentWidth / 2) + distAirX;
+getClosest = function(kickX, kickY)	
+	landX = kickX;
 	--print('landX ' .. landX);
-	landY = (display.contentHeight - 20) + distAirY;
+	landY = kickY;
 	--print('landY ' .. landY);
 	--True distance = square root of ((abs value of diff(landX,playerX))^2 + (abs value of diff(landY, playerY))^2)
-	closestPlayer = nil;
-	local minDistance = nil;
+	local tempClosestPlayer = nil;
+	local tempMinDistance = nil;
 	for i=1,playerTable.numChildren do
-		if(closestPlayer == nil) then
-			closestPlayer = playerTable[i];
+		if(tempClosestPlayer == nil) then
+			tempClosestPlayer = playerTable[i];
 		end
-		if(minDistance == nil) then
-			minDistance = math.sqrt(math.abs(landX - playerTable[i].x)^2 + math.abs(landY - playerTable[i].y)^2);
+		if(tempMinDistance == nil) then
+			tempMinDistance = math.sqrt(math.abs(landX - playerTable[i].x)^2 + math.abs(landY - playerTable[i].y)^2);
 		end
 		
-		if(closestPlayer ~= playerTable[i]) then
+		if(tempClosestPlayer ~= playerTable[i]) then
 			local compDist = math.sqrt(math.abs(landX - playerTable[i].x)^2 + math.abs(landY - playerTable[i].y)^2);
 			--print('Player at ' .. playerTable[i].pos .. ' is ' .. compDist .. ' away');
 			--print('PlayerX ' .. playerTable[i].x);
 			--print('PlayerY ' .. playerTable[i].y);
-			if(compDist < minDistance) then
-				minDistance = compDist;
-				closestPlayer = playerTable[i];
+			if(compDist < tempMinDistance) then
+				tempMinDistance = compDist;
+				tempClosestPlayer = playerTable[i];
 			end
 			compDist = nil;
 		end
 	end
-	print('Closest Player ' .. closestPlayer.pos);
+	--print('Closest Player ' .. closestPlayer.pos);
+	if(closestPlayer == nil) then
+		closestPlayer = tempClosestPlayer;
+		closestPlayer:setFillColor(0,255,0);
+	end
+	if(minDistance == nil) then
+		minDistance = tempMinDistance;
+	end
+	if(previousClosestPlayer == nil) then
+		previousClosestPlayer = closestPlayer;
+		previousClosestColor = (closestPlayer.sex == 'M' and {0,0,255}  or {255,0,0});
+	end
+	if(tempClosestPlayer ~= closestPlayer) then
+		previousClosestPlayer = closestPlayer;
+		previousClosestColor = (closestPlayer.sex == 'M' and {0,0,255}  or {255,0,0});
+		previousClosestPlayer:setFillColor(previousClosestColor[1], previousClosestColor[2], previousClosestColor[3]);
+		closestPlayer = tempClosestPlayer;
+		closestPlayer:setFillColor(0,255,0);
+	end
+end
+
+getClosestFielderToMove = function()
+	getClosest((display.contentWidth / 2) + distAirX, (display.contentHeight - 20) + distAirY);
 	--move closest player to landx,landy at 10 pixels / second
 	local totalMS = minDistance / 10 * 1000;
 	closestPlayer.myTrans = transition.to(closestPlayer, {time = totalMS, x = landX, y = landY, onComplete = listener3});
@@ -186,16 +358,46 @@ end
 
 local function ballWallCollision(self, event)
 	if(event.phase == "began" and event.other.myName == "wall") then
-		--Home Run!!!
+		print('HOME RUN');
+		transition.cancel(closestPlayer.myTrans);
+		timer.performWithDelay(1000, goToPreviousScene);
 	end
 end
 
---ONLY FOR DEBUGGING
-local function didBallStop()
-	local vx, vy = kickBall:getLinearVelocity();
-	if(vx == 0 and vy == 0) then
-		Runtime:removeEventListener("enterFrame", didBallStop);
-		timer.performWithDelay(1000, goToPreviousScene);
+runnerReached = function()
+	if(kicker.isRunning == true) then
+		kicker.isRunning = false;
+	end;
+	if(runnerToFirst == true) then
+		runnerToFirst = false;
+	end;
+	
+end
+
+runnerSecondReached = function()
+	if(firstBaseRunner.isRunning == true) then
+		firstBaseRunner.isRunning = false;
+	end
+	if(runnerToSecond == true) then
+		runnerToSecond = false;
+	end
+end
+
+runnerThirdReached = function()
+	if(secondBaseRunner.isRunning == true) then
+		secondBaseRunner.isRunning = false;
+	end
+	if(runnerToThird == true) then
+		runnerToThird = false;
+	end
+end
+
+runnerHomeReached = function()
+	if(thirdBaseRunner.isRunning == true) then
+		thirdBaseRunner.isRunning = false;
+	end
+	if(runnerToHome == true) then
+		runnerToHome = false;
 	end
 end
 
@@ -203,7 +405,24 @@ moveBallUp = function()
 	kickBall.isInAir = true;
 	myScaleXY = randomAngle / 30 + 1.0;
 	kickBall.myTrans = transition.to(kickBall, {time = ballUpTime, delay=50, x = kickBall.x + distAirX / 2, y = kickBall.y + distAirY / 2, xScale = myScaleXY, yScale = myScaleXY, onComplete = listener1});
-	transition.to(kicker, {time = 2500, x = firstBase.x, y = firstBase.y});
+	transition.to(kicker, {time = 4000, x = firstBase.x, y = firstBase.y, onComplete=runnerReached});
+	kicker.isRunning = true;
+	runnerToFirst = true;
+	if(currentouts == 2) then
+		--everyone should start running if there is two outs no matter what
+		if(firstBaseRunner.exists == true) then
+			runnerToSecond = true;
+		end
+		
+		if(secondBaseRunner.exists == true) then
+			runnerToThird = true;
+		end
+		
+		if(thirdBaseRunner.exists == true) then
+			runnerToHome = true;
+		end
+	else
+	end
 end
 
 moveBallDown = function()
@@ -222,9 +441,31 @@ moveBallRoll = function()
 	kickBall.collision = ballWallCollision;
 	kickBall:addEventListener("collision", kickBall);
 	kickBall:setLinearVelocity(xVel, yVel);
+	transitionClosestToKickball();
+	--if runners are not running, get them to start running
+	if(firstBaseRunner.exists == true) then
+		if(firstBaseRunner.isRunning == false) then
+			runnerToSecond = true;
+			firstBaseRunner.isRunning = true;
+			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = 4000, x = secondBase.x, y = secondBase.y, onComplete=runnerSecondReached});
+		end
+	end
 	
-	--ONLY FOR DEBUGGING
-	Runtime:addEventListener("enterFrame", didBallStop);
+	if(secondBaseRunner.exists == true) then
+		if(secondBaseRunner.isRunning == false) then
+			runnerToThird = true;
+			secondBaseRunner.isRunning = true;
+			secondBaseRunner.myTrans = transition.to(secondBaseRunner, {time = 4000, x = thirdBase.x, y = thirdBase.y, onComplete=runnerThirdReached});
+		end
+	end
+	
+	if(thirdBaseRunner.exists == true) then
+		if(thirdBaseRunner.isRunning = false) then
+			runnerToHome = true;
+			thirdBaseRunner.isRunning = true;
+			thirdBaseRunner.myTrans = transition.to(thirdBaseRunner, {time = 4000, x = homePlate.x, y = homePlate.y, onComplete=runnerHomeReached});
+		end
+	end
 end
 
 createPlayer = function(x,y,color)
@@ -236,6 +477,12 @@ createPlayer = function(x,y,color)
 end
 
 function scene:createScene(event)
+	closestPlayer = nil;
+	minDistance = nil;
+	runnerToFirst = false;
+	runnerToSecond = false;
+	runnerToThird = false;
+	runnerToHome = false;
 	local group = self.view;
 	physics.start();
 	physics.setGravity(0,0);
@@ -255,7 +502,7 @@ function scene:createScene(event)
 	
 	--NEED LINEUP FOR TEAM TO ADD PLAYERS ON FIELD
 	local teamID, lineupPos;
-	for row in db:nrows("SELECT currentinning, currenthalf, hometeamid, awayteamid, playercontrolledteamid, cpucontrolledteamid FROM game") do
+	for row in db:nrows("SELECT currentinning, currenthalf, hometeamid, awayteamid, playercontrolledteamid, cpucontrolledteamid, currentouts FROM game") do
 		--if half == 1 then home else away
 		if(row.currenthalf == 1) then
 			teamID = row.hometeamid
@@ -273,6 +520,7 @@ function scene:createScene(event)
 		else
 			fieldIsCPU = true;
 		end
+		currentouts = row.currentouts;
 	end
 	row = nil;
 	local fieldLineupID, getLineupID;
@@ -290,46 +538,57 @@ function scene:createScene(event)
 		if(row.position == 'P') then
 			p = createPlayer(display.contentWidth / 2, display.contentHeight / 2 + 55, colorOfBox);
 			p.pos = 'P';
+			p.sex = row.sex;
 			playerTable:insert(p);
 		elseif(row.position == 'C') then
-			c = createPlayer(display.contentWidth / 2, display.contentHeight + 3, colorOfBox);
+			c = createPlayer(display.contentWidth / 2, display.contentHeight + 4, colorOfBox);
 			c.pos = 'C';
+			c.sex = row.sex;
 			playerTable:insert(c);
 		elseif(row.position == '3B') then
 			b3 = createPlayer(display.contentWidth / 2 - 70,display.contentHeight / 2 + 40, colorOfBox);
 			b3.pos = '3B';
+			b3.sex = row.sex;
 			playerTable:insert(b3);
 		elseif(row.position == 'SS') then
 			ss = createPlayer(display.contentWidth / 2 - 40,display.contentHeight / 2 - 10,colorOfBox);
 			ss.pos = 'SS';
+			ss.sex = row.sex;
 			playerTable:insert(ss);
 		elseif(row.position == '2B') then
 			b2 = createPlayer(display.contentWidth / 2 + 40, display.contentHeight / 2 - 10, colorOfBox)
 			b2.pos = '2B';
+			b2.sex = row.sex;
 			playerTable:insert(b2);
 		elseif(row.position == '1B') then
 			b1 = createPlayer(display.contentWidth / 2 + 70, display.contentHeight / 2 + 40, colorOfBox);
 			b1.pos = '1B';
+			b1.sex = row.sex;
 			playerTable:insert(b1);
 		elseif(row.position == 'LF') then
 			lf = createPlayer(display.contentWidth / 2 - 150, display.contentHeight / 2 - 40, colorOfBox);
 			lf.pos = 'LF';
+			lf.sex = row.sex;
 			playerTable:insert(lf);
 		elseif(row.position == 'LCF') then
 			lcf = createPlayer(display.contentWidth / 2 - 75, display.contentHeight / 4 - 15, colorOfBox);
 			lcf.pos = 'LCF';
+			lcf.sex = row.sex;
 			playerTable:insert(lcf);
 		elseif(row.position == 'CF') then
 			cf = createPlayer(display.contentWidth / 2, 20, colorOfBox);
 			cf.pos = 'CF';
+			cf.sex = row.sex;
 			playerTable:insert(cf);
 		elseif(row.position == 'RCF') then
 			rcf = createPlayer(display.contentWidth / 2 + 75, display.contentHeight / 4 - 15, colorOfBox);
 			rcf.pos = 'RCF';
+			rcf.sex = row.sex;
 			playerTable:insert(rcf);
 		elseif(row.position == 'RF') then
 			rf = createPlayer(display.contentWidth / 2 + 150, display.contentHeight / 2 - 40, colorOfBox);
 			rf.pos = 'RF';
+			rf.sex = row.sex;
 			playerTable:insert(rf);
 		end
 	end
@@ -379,6 +638,45 @@ function scene:createScene(event)
 	
 	kickBall.pickedUp = false;
 	
+	row = nil;
+	for row in db:nrows("SELECT firstbaserunner, secondbaserunner, thirdbaserunner from GAME") do	
+		if(row.firstbaserunner ~= 0) then
+			firstBaseRunner = display.newRect(0,0,10,10);
+			firstBaseRunner:rotate(45);
+			firstBaseRunner.x = firstBase.x;
+			firstBaseRunner.y = firstBase.y;
+			firstBaseRunner:setFillColor(175,175,175);
+			firstBaseRunner.exists = true;
+			group:insert(firstBaseRunner);
+		else
+			firstBaseRunner.exists = false;
+		end
+		
+		if(row.secondbaserunner ~= 0) then
+			secondBaseRunner = display.newRect(0,0,10,10);
+			secondBaseRunner:rotate(45);
+			secondBaseRunner.x = secondBase.x;
+			secondBaseRunner.y = secondBase.y;
+			secondBaseRunner:setFillColor(175,175,175);
+			secondBaseRunner.exists = true;
+			group:insert(secondBaseRunner);
+		else
+			secondBaseRunner.exists = false;
+		end
+		
+		if(row.thirdbaserunner ~= 0) then
+			thirdBaseRunner = display.newRect(0,0,10,10);
+			thirdBaseRunner:roate(45);
+			thirdBaseRunner.x = thirdBase.x;
+			thirdBaseRunner.y = thirdBase.y;
+			thirdBaseRunner:setFillColor(175,175,175);
+			thirdBaseRunner.exists = true;
+			group:insert(thirdBaseRunner);
+		else
+			thirdBaseRunner.exists = false;
+		end
+	end
+	
 	--Random angle depending on kickpower
 	if(power == 1) then
 		randomAngle = 0;
@@ -395,11 +693,14 @@ function scene:createScene(event)
 	end
 	local setDistance;
 	if(power == 1) then
-		setDistance = 35 * distanceMultiplier;
+		local buntDist = math.random(0, 100);
+		setDistance = buntDist * distanceMultiplier;
 	elseif(power == 2) then
-		setDistance = 75 * distanceMultiplier;
+		local contactDist = math.random(50,125);
+		setDistance = contactDist * distanceMultiplier;
 	else
-		setDistance = 100 * distanceMultiplier;
+		local powerDist = math.random(100,150);
+		setDistance = powerDist * distanceMultiplier;
 	end
 	kickAngle = math.deg(math.asin(dirY / (math.sqrt(math.pow(dirX, 2) + math.pow(dirY, 2)))));
 	distY = setDistance * math.sin(math.rad(kickAngle));
@@ -411,11 +712,11 @@ function scene:createScene(event)
 	local timeInAir = airTimeMultiplier * 4000;
 	local maxDistance;
 	if(power == 1) then
-		maxDistance = 35;
+		maxDistance = 100;
 	elseif(power == 2) then
-		maxDistance = 225;
+		maxDistance = 375;
 	else
-		maxDistance = 300;
+		maxDistance = 450;
 	end
 	local anotherMultiplier = setDistance / maxDistance;
 	ballUpTime = (timeInAir / 2) * anotherMultiplier;

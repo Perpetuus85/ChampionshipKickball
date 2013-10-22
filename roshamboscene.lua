@@ -251,6 +251,22 @@ local function awayButtonEvent(event)
 			gameUpdate = [[UPDATE game SET hometeamid = cpucontrolledteamid]];
 			db:exec(gameUpdate);
 			
+			--set currentkicker to first kicker of first away team lineup
+			local awayLineupID;
+			for row in db:nrows("SELECT MIN(lineupid) as lineupid FROM lineup WHERE teamid = (SELECT awayteamid FROM game)") do
+				awayLineupID = row.lineupid;
+			end
+			local lineupdetailid;
+			for row in db:nrows("SELECT MIN(detailid) as lineupdetailid FROM lineupdetail WHERE lineupid = " .. awayLineupID) do
+				lineupdetailid = row.lineupdetailid;
+			end
+			local playerid;
+			for row in db:nrows("SELECT playerid FROM lineupdetail WHERE detailid = " .. lineupdetailid) do
+				playerid = row.playerid;
+			end
+			gameUpdate = [[UPDATE game SET currentkicker = ]]..playerid[[;]];
+			db:exec(gameUpdate);
+			
 			clearHomeAway();
 			timer.performWithDelay(500, playerFinalTransition);
 		end
@@ -348,6 +364,21 @@ local function cpuWon()
 	db:exec(gameUpdate);
 	--set home team to other teamid
 	gameUpdate = [[UPDATE game SET hometeamid = cpucontrolledteamid]];
+	db:exec(gameUpdate);
+	--set currentkicker to first kicker of first away team lineup
+	local awayLineupID;
+	for row in db:nrows("SELECT MIN(lineupid) as lineupid FROM lineup WHERE teamid = (SELECT awayteamid FROM game)") do
+		awayLineupID = row.lineupid;
+	end
+	local lineupdetailid;
+	for row in db:nrows("SELECT MIN(detailid) as lineupdetailid FROM lineupdetail WHERE lineupid = " .. awayLineupID) do
+		lineupdetailid = row.lineupdetailid;
+	end
+	local playerid;
+	for row in db:nrows("SELECT playerid FROM lineupdetail WHERE detailid = " .. lineupdetailid) do
+		playerid = row.playerid;
+	end
+	gameUpdate = [[UPDATE game SET currentkicker = ]]..playerid..[[;]];
 	db:exec(gameUpdate);
 	transitionClear();
 	timer.performWithDelay(750, cpuHomeTextShow);
@@ -540,7 +571,7 @@ end
 
 local function startCPUSelection()
 	timer.performWithDelay(250, changeChooseOneText);
-	cpuSelected = math.random(1, 3);
+	cpuSelected = 3;
 	timer.performWithDelay(250, addCountdownText);	
 end
 
@@ -624,9 +655,11 @@ end
 function scene:createScene(event)
 	local group = self.view;
 	
-	local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
-	titleLogo.x = display.contentWidth / 2;
-	titleLogo.y = display.contentHeight / 2;
+	--local titleLogo = display.newImageRect("images/qpLineUpBG.jpg", 480, 320);
+	--titleLogo.x = display.contentWidth / 2;
+	--titleLogo.y = display.contentHeight / 2;
+	local titleLogo = display.newRect(0,0,display.contentWidth,display.contentHeight);
+	titleLogo:setFillColor(0,0,0);
 	group:insert(titleLogo);
 	
 	local myFont = "BORG9";
@@ -660,7 +693,7 @@ function scene:createScene(event)
 		overFile = "images/RockHandButtonOver.png",
 		onEvent = rockButtonEvent
 	}
-	rock.x = 80;
+	rock.x = display.contentWidth / 2 - 150;
 	rock.y = display.contentHeight / 2 + 40;
 	group:insert(rock);
 	
@@ -708,7 +741,7 @@ function scene:createScene(event)
 		overFile = "images/ScissorsHandButtonOver.png",
 		onEvent = scissorsButtonEvent
 	}
-	scissors.x = display.contentWidth - 80;
+	scissors.x = display.contentWidth / 2 + 150;
 	scissors.y = display.contentHeight / 2 + 40;
 	scissors.name = "scissors";
 	group:insert(scissors);

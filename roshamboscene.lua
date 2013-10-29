@@ -566,7 +566,7 @@ local function addCountdownText()
 	countdown.y = display.contentHeight - 40;
 	group:insert(countdown);
 	transition.to(countdown, {time = 500, alpha = 0});
-	timer.performWithDelay(750, goCountdown, 4);
+	timer.performWithDelay(600, goCountdown, 4);
 end
 
 local function startCPUSelection()

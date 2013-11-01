@@ -32,7 +32,7 @@ local runnerToFirst, runnerToSecond, runnerToThird, runnerToHome;
 local runnerReached, checkWhatToDo, addOut;
 local runnerSecondReached, runnerThirdReached, runnerHomeReached;
 local runnerBackThirdReached, runnerBackSecondReached, runnerBackFirstReached;
-local checkOutAtFirst, checkOutAtSecond, checkOutAtThird, nextAtBat;
+local checkOutAtFirst, checkOutAtSecond, checkOutAtThird, checkOutAtHome, nextAtBat;
 local firstBaseRunner, secondBaseRunner, thirdBaseRunner;
 local aFBRunner, aSBRunner, aTBRunner;
 local currentouts, keepRunning;
@@ -40,7 +40,10 @@ local holdButton, runForwardButton, runBackButton;
 local homeRunThirdReachedHome, homeRunSecondReachedThird, homeRunSecondReachedHome, homeRunFirstReachedSecond;
 local homeRunFirstReachedThird, homeRunFirstReachedHome;
 local homeRunKickerReachedFirst, homeRunKickerReachedSecond, homeRunKickerReachedThird, homeRunKickerReachedHome;
-local addRun;
+local addRun, runnerKickerReachedSecond, runnerKickerReachedThird, runnerKickerReachedHome;
+local runnerFirstReachedSecond, runnerFirstReachedThird, runnerFirstReachedHome;
+local transitionOutfieldToKickball, outfieldReachedKickball, closestOutfield1, closestOutfield2;
+local pastInfield, secondbaseman;
 
 nextAtBat = function(obj)
 	--check if any runners advanced
@@ -175,6 +178,7 @@ checkOutAtSecond = function()
 					transition.cancel(firstBaseRunner.myTrans);
 					firstBaseRunner:removeSelf();
 					firstBaseRunner = nil;
+					aFBRunner = false;
 				end
 			elseif(aSBRunner == true) then
 				transition.cancel(secondBaseRunner.myTrans);
@@ -194,7 +198,33 @@ checkOutAtThird = function()
 	if(runnerToThird == true) then
 		--OUT
 		print('OUT AT THIRD');
+		runnerToThird = false;
 		--remove either kicker, firstbaserunner, secondbaserunner, or thirdbaserunner
+		if(kicker ~= nil) then
+			if(kicker.goingTo == '3B') then
+				transition.cancel(kicker.myTrans);
+				kicker:removeSelf();
+				kicker = nil;
+			end
+		elseif(aFBRunner == true) then
+			if(firstBaseRunner.goingTo == '3B') then
+				transition.cancel(firstBaseRunner.myTrans);
+				firstBaseRunner:removeSelf();
+				firstBaseRunner = nil;
+			end
+		elseif(aSBRunner == true) then
+			if(secondBaseRunner.goingTo == '3B') then
+				transition.cancel(secondBaseRunner.myTrans);
+				secondBaseRunner:removeSelf();
+				secondBaseRunner = nil;
+			end
+		elseif(aTBRunner == true) then
+			if(thirdBaseRunner.goingTo == '3B') then
+				transition.cancel(thirdBaseRunner.myTrans);
+				thirdBaseRunner:removeSelf();
+				thridBaseRunner = nil;
+			end
+		end
 		addOut();		
 	else
 		--SAFE
@@ -203,11 +233,134 @@ checkOutAtThird = function()
 	end	
 end
 
+checkOutAtHome = function()
+	if(runnerToHome == true) then
+		--OUT
+		print('OUT AT HOME');
+		runnerToHome = false;
+		--remove either kicker, firstbaserunner, secondbaserunner, or thirdbaserunner
+		if(kicker ~= nil) then
+			if(kicker.goingTo == 'H') then
+				transition.cancel(kicker.myTrans);
+				kicker:removeSelf();
+				kicker = nil;
+			end
+		elseif(aFBRunner == true) then
+			if(firstBaseRunner.goingTo == 'H') then
+				transition.cancel(firstBaseRunner.myTrans);
+				firstBaseRunner:removeSelf();
+				firstBaseRunner = nil;
+			end
+		elseif(aSBRunner == true) then
+			if(secondBaseRunner.goingTo == 'H') then
+				transition.cancel(secondBaseRunner.myTrans);
+				secondBaseRunner:removeSelf();
+				secondBaseRunner = nil;
+			end
+		elseif(aTBRunner == true) then
+			if(thirdBaseRunner.goingTo == 'H') then
+				transition.cancel(thirdBaseRunner.myTrans);
+				thirdBaseRunner:removeSelf();
+				thridBaseRunner = nil;
+			end
+		end
+		addOut();
+	else
+		--SAFE
+		print('SAFE AT HOME');
+		timer.performWithDelay(500, checkWhatToDo);
+	end
+end
+
 checkWhatToDo = function()
 	--if fieldIsCPU is true decide where to throw
 	--else show player where they can throw
-	if(runnerToThird == true or (aTBRunner == true and thirdBaseRunner.isTaggedUp == false)) then
+	--if there are two outs, go to closest force out base
+	--if lf,lcf, throw to ss
+	--if cf rcf rf, throw to b2
+	print('checking what to do');
+	if(closestPlayer.pos == 'LF' or closestPlayer.pos == 'LCF') then
+		print('in outfield, throw to cutoff ss');
+		local dist = math.sqrt((closestPlayer.x - ss.x)^2 + (closestPlayer.y - ss.y)^2);
+		local myTime = dist / 65 * 1000;
+		closestPlayer = ss;
+		transition.to(kickBall, {time = myTime, x = ss.x, y = ss.y});
+		timer.performWithDelay(myTime + 500, checkWhatToDo);
+	elseif(closestPlayer.pos == 'CF' or closestPlayer.pos == 'RCF' or closestPlayer.pos == 'RF') then
+		print('in outfield, throw to cutoff b2');
+		local dist = math.sqrt((closestPlayer.x - b2.x)^2 + (closestPlayer.y - b2.y)^2);
+		local myTime = dist / 65 * 1000;
+		closestPlayer = b2;
+		transition.to(kickBall, {time = myTime, x = b2.x, y = b2.y});
+		timer.performWithDelay(myTime + 500, checkWhatToDo);
+	elseif(currentouts == 2) then
+		print('2 outs');
+		local closestBase;
+		if(runnerToHome == true and closestBase == 'H') then
+			print('throw home');
+			if(closestPlayer.pos ~= 'C') then
+				local dist = math.sqrt((closestPlayer.x - c.x)^2 + (closestPlayer.y - c.y)^2);
+				local myTime = dist / 65 * 1000;
+				transition.to(kickBall, {time = myTime, x = c.x, y = c.y, onComplete = checkOutAtHome});
+			else
+				local dist = math.sqrt((closestPlayer.x - homePlate.x)^2 + (closestPlayer.y - homePlate.y)^2);
+				local myTime = dist / 10 * 1000;
+				transition.to(closestPlayer, {time = myTime, x = homePlate.x, y = homePlate.y, onComplete = checkOutAtHome});
+			end
+		elseif(runnerToThird == true and closestBase == '3B') then
+			print('throw 3b');
+			if(closestPlayer.pos ~= '3B') then
+				local dist = math.sqrt((closestPlayer.x - b3.x)^2 + (closestPlayer.y - b3.y)^2);
+				local myTime = dist / 65 * 1000;
+				transition.to(kickBall, {time = myTime, x = b3.x, y = b3.y, onComplete = checkOutAtThird});
+			else
+				local dist = math.sqrt((closestPlayer.x - thirdBase.x)^2 + (closestPlayer.y - thirdBase.y)^2);
+				local myTime = dist / 10 * 1000;
+				transition.to(closestPlayer, {time = myTime, x = thirdBase.x, y = thirdBase.y, onComplete = checkOutAtThird});
+			end
+		elseif(runnerToSecond == true and closestBase == '2B') then
+			print('throw 2b');
+			if(secondbaseman.atBase == false) then
+				print('second not at second');
+				timer.performWithDelay(250, checkWhatToDo);
+			else
+				local dist = math.sqrt((closestPlayer.x - secondbaseman.x)^2 + (closestPlayer.y - secondbaseman.y)^2);
+				--calc time going 30 pps
+				local myTime = dist / 65 * 1000;
+				transition.to(kickBall, {time = myTime, x = secondbaseman.x, y = secondbaseman.y, onComplete=checkOutAtSecond});
+			end
+		elseif(runnerToFirst == true and closestBase == '1B') then
+			print('throw 1b');
+			if(closestPlayer.pos ~= '1B') then
+				--throw to first
+				local dist = math.sqrt((closestPlayer.x - b1.x)^2 + (closestPlayer.y - b1.y)^2);
+				local myTime = dist / 65 * 1000;
+				transition.to(kickBall, {time = myTime, x = b1.x, y = b1.y, onComplete=checkOutAtFirst});
+			else
+				--else run to first
+				local dist = math.sqrt((closestPlayer.x - b1.x)^2 + (closestPlayer.y - b1.y)^2);
+				local myTime = dist / 10 * 1000;
+				transition.to(b1, {time = myTime, x = firstBase.x, y = firstBase.y, onComplete=checkOutAtFirst});
+			end
+		end
+	elseif(runnerToHome == true) then
+		--if not C
+		print('runner to home');
+		if(closestPlayer.pos ~= 'C') then
+			--throw to home
+			--get distance from closestPlayer to C
+			local dist = math.sqrt((closestPlayer.x - c.x)^2 + (closestPlayer.y - c.y)^2);
+			local myTime = dist / 65 * 1000;
+			transition.to(kickBall, {time = myTime, x = c.x, y = c.y, onComplete=checkOutAtHome});
+		else
+			--else run to home
+			local dist = math.sqrt((closestPlayer.x - homePlate.x)^2 + (closestPlayer.y - homePlate.y)^2);
+			local myTime = dist / 10 * 1000;
+			transition.to(closestPlayer, {time = myTime, x = homePlate.x, y = homePlate.y, onComplete = checkOutAtHome});
+		end
+	elseif(runnerToThird == true or (aTBRunner == true and thirdBaseRunner.isTaggedUp == false)) then
 		--if not b3
+		print('runner to third');
 		if(closestPlayer.pos ~= '3B') then
 			--throw to third
 			--get distance from closestPlayer to b3
@@ -217,38 +370,54 @@ checkWhatToDo = function()
 			transition.to(kickBall, {time = myTime, x = b3.x, y = b3.y, onComplete=checkOutAtThird});
 		else
 			--else run to third
+			local dist = math.sqrt((closestPlayer.x - thirdBase.x)^2 + (closestPlayer.y - thirdBase.y)^2);
+			local myTime = dist / 10 * 1000;
+			transition.to(closestPlayer, {time = myTime, x = thirdBase.x, y = thirdBase.y, onComplete = checkOutAtThird});
 		end
 	elseif(runnerToSecond == true or (aSBRunner == true and secondBaseRunner.isTaggedUp == false)) then
 		--always throw to second no matter who closest player is
-		local secondBaseMan;
-		if(kickBall.x > display.contentWidth / 2) then
-			secondBaseMan = ss;
+		print('runner to second');
+		if(secondbaseman.atBase == false) then
+			print('second not at second');
+			timer.performWithDelay(250, checkWhatToDo);
 		else
-			secondBaseMan = b2;
+			local dist = math.sqrt((closestPlayer.x - secondbaseman.x)^2 + (closestPlayer.y - secondbaseman.y)^2);
+			--calc time going 30 pps
+			local myTime = dist / 65 * 1000;
+			transition.to(kickBall, {time = myTime, x = secondbaseman.x, y = secondbaseman.y, onComplete=checkOutAtSecond});
 		end
-		local dist = math.sqrt((closestPlayer.x - secondBaseMan.x)^2 + (closestPlayer.y - secondBaseMan.y)^2);
-		--calc time going 30 pps
-		local myTime = dist / 65 * 1000;
-		transition.to(kickBall, {time = myTime, x = secondBaseMan.x, y = secondBaseMan.y, onComplete=checkOutAtSecond});
 	elseif(runnerToFirst == true or (aFBRunner == true and firstBaseRunner.isTaggedUp == false)) then
 		--if not b1
+		print('runner to first');
 		if(closestPlayer.pos ~= '1B') then
-			--throw to first
+			print('throw to first');
 			local dist = math.sqrt((closestPlayer.x - b1.x)^2 + (closestPlayer.y - b1.y)^2);
 			local myTime = dist / 65 * 1000;
 			transition.to(kickBall, {time = myTime, x = b1.x, y = b1.y, onComplete=checkOutAtFirst});
 		else
-			--else run to first
+			print('run to first');
+			local dist = math.sqrt((closestPlayer.x - b1.x)^2 + (closestPlayer.y - b1.y)^2);
+			local myTime = dist / 10 * 1000;
+			transition.to(b1, {time = myTime, x = firstBase.x, y = firstBase.y, onComplete=checkOutAtFirst});
 		end
 	else
-		--if not pitcher
-		if(closestPlayer.pos ~= 'P') then
-			--throw to pitcher
+		print('no runners');
+		if(kickBall.x ~= p.x and kickBall.y ~= p.y) then
+			print('throw to pitcher');
 			local dist = math.sqrt((closestPlayer.x - p.x)^2 + (closestPlayer.y - p.y)^2);
 			local myTime = dist / 65 * 1000;
-			transition.to(kickBall, {time = myTime, x = p.x, y = p.y, onComplete=nextAtBat});
+			print('time to p: ' .. myTime);
+			transition.to(kickBall, {time = myTime, x = p.x, y = p.y, onComplete=checkWhatToDo});
 		else
-			--else go to previousScene
+			--else go to previousScene	
+			print('kickball at p');
+			if(runnerToFirst == true or runnerToSecond == true or runnerToThird == true or runnerToHome == true) then
+				print('check what to do');
+				checkWhatToDo();
+			else
+				print('next at bat');
+				nextAtBat(nil);
+			end
 		end
 	end
 end
@@ -268,6 +437,19 @@ reachedKickball = function(obj)
 	else
 		getClosest(kickBall.x, kickBall.y);
 		transitionClosestToKickball();
+	end
+end
+
+outfieldReachedKickball = function(obj)
+	if(kickBall.pickedUp == true) then
+		transition.cancel(closestOutfield1.myTrans);
+		transition.cancel(closestOutfield2.myTrans);
+	elseif(closestPlayer.pos == closestOutfield1.pos) then
+		transition.cancel(closestOutfield2.myTrans);
+	elseif(closestPlayer.pos == closestOutfield2.pos) then
+		transition.cancel(closestOutfield1.myTrans);
+	else
+		transitionOutfieldToKickball();
 	end
 end
 
@@ -293,6 +475,114 @@ transitionClosestToKickball = function()
 	--print('DistY ' .. myDistY);
 	--print('DistX ' .. myDistX);
 	closestPlayer.myTrans = transition.to(closestPlayer, {time = 100, delta = true, x = myDistX, y = myDistY, onComplete = reachedKickball});
+end
+
+transitionOutfieldToKickball = function()
+	if(kickBall.x >= display.contentWidth / 2) then
+		--move rcf and rf
+		local kX = kickBall.x;
+		local kY = kickBall.y;
+		local p1X = rcf.x;
+		local p1Y = rcf.y;
+		local p2X = rf.x;
+		local p2Y = rf.y;
+		local h1 = math.sqrt((kX - p1X)^2 + (kY - p1Y)^2);
+		local y1 = math.abs(kY - p1Y);
+		local h2 = math.sqrt((kX - p2X)^2 + (kY - p2Y)^2);
+		local y2 = math.abs(kY - p2Y);
+		local angle1 = math.asin(y1 / h1);
+		local angle2 = math.asin(y2 / h2);
+		local dist1Y = 2.5 * math.sin(angle1);
+		local dist1X = 2.5 * math.cos(angle1);
+		local dist2Y = 2.5 * math.sin(angle2);
+		local dist2X = 2.5 * math.cos(angle2);
+		if(kX < p1X) then
+			dist1X = -1 * dist1X;
+		end
+		if(kY < p1Y) then
+			dist1Y = -1 * dist1Y;
+		end
+		if(kX < p2X) then
+			dist2X = -1 * dist2X;
+		end
+		if(kY < p2Y) then
+			dist2Y = -1 * dist2Y;
+		end
+		closestOutfield1 = rcf;
+		closestOutfield2 = rf;
+		if(closestPlayer.pos ~= closestOutfield1.pos and closestPlayer.pos ~= closestOutfield2.pos) then
+			closestOutfield1.myTrans = transition.to(closestOutfield1, {time = 100, delta = true, x = dist1X, y = dist1Y, onComplete = outfieldReachedKickball});
+			closestOutfield2.myTrans = transition.to(closestOutfield2, {time = 100, delta = true, x = dist2X, y = dist2Y, onComplete = outfieldReachedKickball});
+		end
+		kX = nil;
+		kY = nil;
+		p1X = nil;
+		p1Y = nil;
+		p2X = nil;
+		p2Y = nil;
+		h1 = nil;
+		y1 = nil;
+		h2 = nil;
+		y2 = nil;
+		angle1 = nil;
+		angle2 = nil;
+		dist1Y = nil;
+		dist1X = nil;
+		dist2Y = nil;
+		dist2X = nil;
+	else
+		--move lcf and lf
+		local kX = kickBall.x;
+		local kY = kickBall.y;
+		local p1X = lcf.x;
+		local p1Y = lcf.y;
+		local p2X = lf.x;
+		local p2Y = lf.y;
+		local h1 = math.sqrt((kX - p1X)^2 + (kY - p1Y)^2);
+		local y1 = math.abs(kY - p1Y);
+		local h2 = math.sqrt((kX - p2X)^2 + (kY - p2Y)^2);
+		local y2 = math.abs(kY - p2Y);
+		local angle1 = math.asin(y1 / h1);
+		local angle2 = math.asin(y2 / h2);
+		local dist1Y = 2.5 * math.sin(angle1);
+		local dist1X = 2.5 * math.cos(angle1);
+		local dist2Y = 2.5 * math.sin(angle2);
+		local dist2X = 2.5 * math.cos(angle2);
+		if(kX < p1X) then
+			dist1X = -1 * dist1X;
+		end
+		if(kY < p1Y) then
+			dist1Y = -1 * dist1Y;
+		end
+		if(kX < p2X) then
+			dist2X = -1 * dist2X;
+		end
+		if(kY < p2Y) then
+			dist2Y = -1 * dist2Y;
+		end
+		closestOutfield1 = lcf;
+		closestOutfield2 = lf;
+		if(closestPlayer.pos ~= closestOutfield1.pos and closestPlayer.pos ~= closestOutfield2.pos) then
+			closestOutfield1.myTrans = transition.to(closestOutfield1, {time = 100, delta = true, x = dist1X, y = dist1Y, onComplete = outfieldReachedKickball});
+			closestOutfield2.myTrans = transition.to(closestOutfield2, {time = 100, delta = true, x = dist2X, y = dist2Y, onComplete = outfieldReachedKickball});
+		end
+		kX = nil;
+		kY = nil;
+		p1X = nil;
+		p1Y = nil;
+		p2X = nil;
+		p2Y = nil;
+		h1 = nil;
+		y1 = nil;
+		h2 = nil;
+		y2 = nil;
+		angle1 = nil;
+		angle2 = nil;
+		dist1Y = nil;
+		dist1X = nil;
+		dist2Y = nil;
+		dist2X = nil;
+	end
 end
 
 addOut = function()
@@ -342,6 +632,11 @@ getClosest = function(kickX, kickY)
 	--True distance = square root of ((abs value of diff(landX,playerX))^2 + (abs value of diff(landY, playerY))^2)
 	local tempClosestPlayer = nil;
 	local tempMinDistance = nil;
+	if(kickBall.y > ss.y or kickBall.y > b2.y) then
+		pastInfield = true;
+	else
+		pastInfield = false;
+	end
 	for i=1,playerTable.numChildren do
 		if(tempClosestPlayer == nil) then
 			tempClosestPlayer = playerTable[i];
@@ -351,15 +646,14 @@ getClosest = function(kickX, kickY)
 		end
 		
 		if(tempClosestPlayer ~= playerTable[i]) then
-			local compDist = math.sqrt(math.abs(landX - playerTable[i].x)^2 + math.abs(landY - playerTable[i].y)^2);
-			--print('Player at ' .. playerTable[i].pos .. ' is ' .. compDist .. ' away');
-			--print('PlayerX ' .. playerTable[i].x);
-			--print('PlayerY ' .. playerTable[i].y);
-			if(compDist < tempMinDistance) then
-				tempMinDistance = compDist;
-				tempClosestPlayer = playerTable[i];
+			if(pastInfield == false or (pastInfield == true and (playerTable[i].pos == 'LF' or playerTable[i].pos == 'LCF' or playerTable[i].pos == 'CF' or playerTable[i].pos == 'RCF' or playerTable[i].pos == 'RF'))) then
+				local compDist = math.sqrt(math.abs(landX - playerTable[i].x)^2 + math.abs(landY - playerTable[i].y)^2);
+				if(compDist < tempMinDistance) then
+					tempMinDistance = compDist;
+					tempClosestPlayer = playerTable[i];
+				end
+				compDist = nil;
 			end
-			compDist = nil;
 		end
 	end
 	--print('Closest Player ' .. closestPlayer.pos);
@@ -383,6 +677,10 @@ getClosest = function(kickX, kickY)
 	end
 end
 
+local function secondAtSecond()
+	secondbaseman.atBase = true;
+end
+
 getClosestFielderToMove = function()
 	getClosest((display.contentWidth / 2) + distAirX, (display.contentHeight - 20) + distAirY);
 	--move closest player to landx,landy at 10 pixels / second
@@ -404,14 +702,18 @@ getClosestFielderToMove = function()
 		if(closestPlayer.pos ~= 'SS') then
 			local ssDist = math.sqrt(math.abs(ss.x - (secondBase.x))^2 + math.abs(ss.y - (secondBase.y + 4))^2);
 			local ssTime = ssDist / 15 * 1000;
-			ss.myTrans = transition.to(ss, {time = ssTime, x = secondBase.x, y = secondBase.y + 4});
+			ss.myTrans = transition.to(ss, {time = ssTime, x = secondBase.x, y = secondBase.y + 4, onComplete=secondAtSecond});
+			secondbaseman = ss;
+			secondbaseman.atBase = false;
 		end
 	else
 		--move b2 to 2B if not closest player and land.y <= display.contentWidth / 2
 		if(closestPlayer.pos ~= '2B') then
 			local b2Dist = math.sqrt(math.abs(b2.x - (secondBase.x))^2 + math.abs(b2.y - (secondBase.y + 4))^2);
 			local b2Time = b2Dist / 15 * 1000;
-			b2.myTrans = transition.to(b2, {time = b2Time, x = secondBase.x, y = secondBase.y + 4});
+			b2.myTrans = transition.to(b2, {time = b2Time, x = secondBase.x, y = secondBase.y + 4, onComplete=secondAtSecond});
+			secondbaseman = b2;
+			secondbaseman.atBase = false;
 		end
 	end
 	
@@ -463,6 +765,17 @@ local function listener2(obj)
 end
 
 addRun = function()
+	local currentHalf;
+	for row in db:nrows("SELECT currenthalf FROM game") do	
+		currentHalf = row.currenthalf;
+	end
+	local gameUpdate;
+	if(currentHalf == 1) then
+		gameUpdate = [[UPDATE game SET awayscore = awayscore + 1;]];
+	else
+		gameUpdate = [[UPDATE game SET homescore = homescore + 1;]];
+	end
+	db:exec(gameUpdate);
 end
 
 homeRunThirdReachedHome = function()
@@ -589,6 +902,7 @@ runnerReached = function()
 	if(runnerToFirst == true) then
 		runnerToFirst = false;
 	end;
+	kicker.isOn = '1B';
 	
 end
 
@@ -599,6 +913,7 @@ runnerSecondReached = function()
 	if(runnerToSecond == true) then
 		runnerToSecond = false;
 	end
+	firstBaseRunner.isOn = '2B';
 end
 
 runnerThirdReached = function()
@@ -608,6 +923,7 @@ runnerThirdReached = function()
 	if(runnerToThird == true) then
 		runnerToThird = false;
 	end
+	secondBaseRunner.isOn = '3B';
 end
 
 runnerHomeReached = function()
@@ -635,6 +951,48 @@ runnerBackFirstReached = function()
 	firstBaseRunner.isRunning = false;
 	runnerToFirst = false;
 	firstBaseRunner.isTaggedUp = true;
+end
+
+runnerKickerReachedSecond = function()
+	kicker.isRunning = false;
+	runnerToSecond = false;
+	kicker.isOn = '2B';
+end
+
+runnerKickerReachedThird = function()
+	kicker.isRunning = false;
+	runnerToThird = false;
+	kicker.isOn = '3B';
+end
+
+runnerKickerReachedHome = function()
+	--add run
+	addRun();
+	--remove kicker
+	kicker:removeSelf();
+	kicker = nil;
+	--go to next at bat
+	nextAtBat(nil);
+end
+
+runnerFirstReachedSecond = function()
+	firstBaseRunner.isRunning = false;
+	runnerToSecond = false;
+	firstBaseRunner.isOn = '2B';
+end
+
+runnerFirstReachedThird = function()
+	firstBaseRunner.isRunning = false;
+	runnerToThird = false;
+	firstBaseRunner.isOn = '3B';
+end
+
+runnerFirstReachedHome = function()
+	--add run
+	addRun();
+	--remove kicker
+	firstBaseRunner:removeSelf();
+	firstBaseRunner = nil;
 end
 
 moveBallUp = function()
@@ -788,7 +1146,7 @@ local function runForwardButtonTouch(event)
 	end
 	
 	if(aFBRunner == true) then
-		if(runnerToSecond == false) then
+		if(firstBaseRunner.isOn == '1B' and firstBaseRunner.isRunning == false) then
 			if(firstBaseRunner.myTrans ~= nil) then
 				transition.cancel(firstBaseRunner.myTrans);
 			end
@@ -804,7 +1162,39 @@ local function runForwardButtonTouch(event)
 			local fullDistance = math.sqrt((firstBase.x - secondBase.x)^2 + (firstBase.y - secondBase.y)^2);
 			local remainPercentage = remainingDistance / fullDistance;
 			tTime = remainPercentage * 4000;
-			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = tTime, x = secondBase.x, y = secondBase.y, onComplete=runnerSecondReached});
+			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = tTime, x = secondBase.x, y = secondBase.y, onComplete=runnerFirstReachedSecond});
+		elseif(firstBaseRunner.isOn == '2B') then
+			local tTime;
+			local remainingDistance = math.sqrt((firstBaseRunner.x - thirdBase.x)^2 + (firstBaseRunner.y - thirdBase.y)^2);
+			local fullDistance = math.sqrt((secondBase.x - thirdBase.x)^2 + (secondBase.y - thirdBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = tTime, x = thirdBase.x, y = thirdBase.y, onComplete=runnerFirstReachedThird});
+		elseif(firstBaseRunner.isOn == '3B') then
+		end
+	end
+	
+	if(kicker ~= nil) then
+		if(kicker.isOn == '1B' and kicker.isRunning == false) then
+			local tTime;
+			local remainingDistance = math.sqrt((kicker.x - secondBase.x)^2 + (kicker.y - secondBase.y)^2);
+			local fullDistance = math.sqrt((firstBase.x - secondBase.x)^2 + (firstBase.y - secondBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			kicker.myTrans = transition.to(kicker, {time = tTime, x = secondBase.x, y = secondBase.y, onComplete = runnerKickerReachedSecond});
+			kicker.goingTo = '2B';
+			runnerToSecond = true;
+			kicker.isRunning = true;
+		elseif(kicker.isOn == '2B' and kicker.isRunning == false) then
+			local tTime;
+			local remainingDistance = math.sqrt((kicker.x - thirdBase.x)^2 + (kicker.y - thirdBase.y)^2);
+			local fullDistance = math.sqrt((secondBase.x - thirdBase.x)^2 + (secondBase.y - thirdBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			kicker.myTrans = transition.to(kicker, {time = tTime, x = thirdBase.x, y = thirdBase.y, onComplete = runnerKickerReachedSecond});
+			kicker.goingTo = '3B';
+			runnerToThird = true;
+			kicker.isRunning = true;
 		end
 	end
 end
@@ -850,7 +1240,47 @@ local function runBackButtonTouch(event)
 		local fullDistance = math.sqrt((secondBase.x - firstBase.x)^2 + (secondBase.y - firstBase.y)^2);
 		local remainPercentage = remainingDistance / fullDistance;
 		tTime = remainPercentage * 4000;
-		firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = tTime, x = firstBase.x, y = secondBase.y, onComplete=runnerBackFirstReached});
+		firstBaseRunner.myTrans = transition.to(firstBaseRunner, {time = tTime, x = firstBase.x, y = firstBase.y, onComplete=runnerBackFirstReached});
+	end
+	
+	if(kicker ~= nil) then
+		if(kicker.isRunning == true) then
+			transition.cancel(kicker.myTrans);
+		end
+		if(kicker.goingTo == '2B') then
+			--back to first
+			kicker.isRunning = true;
+			runnerToFirst = true;
+			kicker.goingTo = '1B';
+			local tTime;
+			local remainingDistance = math.sqrt((kicker.x - firstBase.x)^2 + (kicker.y - firstBase.y)^2);
+			local fullDistance = math.sqrt((secondBase.x - firstBase.x)^2 + (secondBase.y - firstBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			kicker.myTrans = transition.to(kicker, {time = tTime, x = firstBase.x, y = firstBase.y, onComplete=runnerBackFirstReached});
+		elseif(kicker.goingTo == '3B') then
+			--back to second
+			kicker.isRunning = true;
+			runnerToSecond = true;
+			kicker.goingTo = '2B';
+			local tTime;
+			local remainingDistance = math.sqrt((kicker.x - secondBase.x)^2 + (kicker.y - secondBase.y)^2);
+			local fullDistance = math.sqrt((thirdBase.x - secondBase.x)^2 + (thirdBase.y - secondBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			kicker.myTrans = transition.to(kicker, {time = tTime, x = secondBase.x, y = secondBase.y, onComplete=runnerBackSecondReached});
+		elseif(kicker.goingTo == 'H') then
+			--back to third
+			kicker.isRunning = true;
+			runnerToSecond = true;
+			kicker.goingTo = '3B';
+			local tTime;
+			local remainingDistance = math.sqrt((kicker.x - thirdBase.x)^2 + (kicker.y - thirdBase.y)^2);
+			local fullDistance = math.sqrt((homePlate.x - thirdBase.x)^2 + (homePlate.y - thirdBase.y)^2);
+			local remainPercentage = remainingDistance / fullDistance;
+			tTime = remainPercentage * 4000;
+			kicker.myTrans = transition.to(kicker, {time = tTime, x = thirdBase.x, y = thirdBase.y, onComplete=runnerBackSecondReached});
+		end
 	end
 end
 
@@ -1011,6 +1441,7 @@ function scene:createScene(event)
 	kicker:rotate(45);
 	kicker.x = display.contentWidth / 2;
 	kicker.y = display.contentHeight - 18;
+	kicker.isOn = 'H';
 	kicker:setFillColor(0,0,255);
 	group:insert(kicker);
 	
@@ -1110,6 +1541,7 @@ function scene:createScene(event)
 			aFBRunner = true;
 			firstBaseRunner.isRunning = false;
 			firstBaseRunner.isTaggedUp = true;
+			firstBaseRunner.isOn = '1B';
 			group:insert(firstBaseRunner);
 		else
 			aFBRunner = false;
@@ -1124,6 +1556,7 @@ function scene:createScene(event)
 			aSBRunner = true;
 			secondBaseRunner.isRunning = false;
 			secondBaseRunner.isTaggedUp = true;
+			secondBaseRunner.isOn = '2B';
 			group:insert(secondBaseRunner);
 		else
 			aSBRunner = false;
@@ -1131,13 +1564,14 @@ function scene:createScene(event)
 		
 		if(row.thirdbaserunner ~= 0) then
 			thirdBaseRunner = display.newRect(0,0,10,10);
-			thirdBaseRunner:roate(45);
+			thirdBaseRunner:rotate(45);
 			thirdBaseRunner.x = thirdBase.x;
 			thirdBaseRunner.y = thirdBase.y;
 			thirdBaseRunner:setFillColor(175,175,175);
 			aTBRunner = true;
 			thirdBaseRunner.isRunning = false;
 			thirdBaseRunner.isTaggedUp = true;
+			thirdBaseRunner.isOn = '3B';
 			group:insert(thirdBaseRunner);
 		else
 			aTBRunner = false;
@@ -1163,10 +1597,10 @@ function scene:createScene(event)
 		local buntDist = math.random(0, 100);
 		setDistance = buntDist * distanceMultiplier;
 	elseif(power == 2) then
-		local contactDist = math.random(50,125);
+		local contactDist = math.random(25,125);
 		setDistance = contactDist * distanceMultiplier;
 	else
-		local powerDist = math.random(100,150);
+		local powerDist = math.random(50,150);
 		setDistance = powerDist * distanceMultiplier;
 	end
 	kickAngle = math.deg(math.asin(dirY / (math.sqrt(math.pow(dirX, 2) + math.pow(dirY, 2)))));
@@ -1193,6 +1627,7 @@ function scene:createScene(event)
 	distAirY = distY * airTimeMultiplier;
 	distRollX = distX - distAirX;
 	distRollY = distY - distAirY;
+	pastInfield = false;
 	getClosestFielderToMove();
 end
 

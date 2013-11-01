@@ -59,12 +59,22 @@ function scene:createScene(event)
 
 	local group = self.view;
 	
-	local titleLogo = display.newImageRect("images/fieldBase.jpg", 480, 320);
-	titleLogo.x = display.contentWidth / 2;
-	titleLogo.y = display.contentHeight / 2;
-	group:insert(titleLogo);
+	--local titleLogo = display.newImageRect("images/fieldBase.jpg", 480, 320);
+	--titleLogo.x = display.contentWidth / 2;
+	--titleLogo.y = display.contentHeight / 2;
+	--group:insert(titleLogo);
 	
 	local myFont = "BORG9";
+	
+	local championshipLogo = display.newText("Championship", 0,0,myFont, 48);
+	championshipLogo.x = display.contentWidth / 2;
+	championshipLogo.y = display.contentHeight / 2 - 100;
+	group:insert(championshipLogo);
+	
+	local kickballLogo = display.newText("Kickball", 0,0,myFont, 48);
+	kickballLogo.x = display.contentWidth / 2;
+	kickballLogo.y = display.contentHeight / 2 - 60;
+	group:insert(kickballLogo);
 	
 	quickPlay = widget.newButton
 	{
